@@ -1,0 +1,10 @@
+{
+	"name": "caresync_rg_kv_ls",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://caresync-rg-kv.vault.azure.net/"
+		}
+	}
+}
