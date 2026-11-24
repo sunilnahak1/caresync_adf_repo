@@ -1,6 +1,5 @@
 {
 	"name": "caresync_PostgreSql_ls",
-	"type": "Microsoft.DataFactory/factories/linkedservices",
 	"properties": {
 		"annotations": [],
 		"type": "PostgreSqlV2",
@@ -9,9 +8,17 @@
 			"port": 5432,
 			"database": "neondb",
 			"username": "neondb_owner",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVaultls",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "postgresql-password"
+			},
 			"sslMode": 2,
-			"authenticationType": "Basic",
-			"encryptedCredential": "ew0KICAiVmVyc2lvbiI6ICIyMDE3LTExLTMwIiwNCiAgIlByb3RlY3Rpb25Nb2RlIjogIktleSIsDQogICJTZWNyZXRDb250ZW50VHlwZSI6ICJQbGFpbnRleHQiLA0KICAiQ3JlZGVudGlhbElkIjogIkRBVEFGQUNUT1JZQDBBNUVCREMwLTFFMjMtNEZFQS1BNEU2LUVDNTBDMzQ3NjUyMl84N2UwYjIwYS02ODFkLTQ2ZWMtOTcyOC0zZmI5YzUxODMxNmMiDQp9"
+			"authenticationType": "Basic"
 		}
-	}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
 }
