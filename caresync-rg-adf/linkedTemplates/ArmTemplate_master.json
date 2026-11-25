@@ -39,6 +39,10 @@
 			"type": "string",
 			"defaultValue": "https://caresyncrgstg.dfs.core.windows.net/"
 		},
+		"AzureDatabricksLS_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "1125-080008-blhcw8t7"
+		},
 		"containerUri": {
 			"type": "string",
 			"metadata": "URI to storage account containing linked ARM templates"
@@ -89,6 +93,9 @@
 					},
 					"caresync_PostgreSql_ls_properties_typeProperties_username": {
 						"value": "[parameters('caresync_PostgreSql_ls_properties_typeProperties_username')]"
+					},
+					"AzureDatabricksLS_properties_typeProperties_existingClusterId": {
+						"value": "[parameters('AzureDatabricksLS_properties_typeProperties_existingClusterId')]"
 					}
 				}
 			},
