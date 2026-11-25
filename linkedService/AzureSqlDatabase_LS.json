@@ -1,0 +1,23 @@
+{
+	"name": "AzureSqlDatabase_LS",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"server": "caresync-sunil-server.database.windows.net",
+			"database": "caresyncsql-sunil-db",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SQL",
+			"userName": "user",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "AzureKeyVaultls",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "caresyncsql-sunil-db-password"
+			}
+		}
+	}
+}
