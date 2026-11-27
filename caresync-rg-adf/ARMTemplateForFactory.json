@@ -7,6 +7,10 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "caresync-rg-adf"
 		},
+		"AzureDatabricksLS_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "1125-080008-blhcw8t7"
+		},
 		"AzureKeyVaultls_properties_typeProperties_baseUrl": {
 			"type": "string",
 			"defaultValue": "https://caresync-rg-sunil-kv.vault.azure.net/"
@@ -38,10 +42,6 @@
 		"caresync_adls_ls_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://caresyncrgstg.dfs.core.windows.net/"
-		},
-		"AzureDatabricksLS_properties_typeProperties_existingClusterId": {
-			"type": "string",
-			"defaultValue": "1125-080008-blhcw8t7"
 		}
 	},
 	"variables": {
@@ -252,6 +252,42 @@
 							"referenceName": "AzureDatabricksLS",
 							"type": "LinkedServiceReference"
 						}
+					},
+					{
+						"name": "Updated Progress Status",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Bronze To Silver",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_LS",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "UPDATE ctrl.audit_log\nSET status = 'SUCCESS',  end_time = SYSUTCDATETIME(), records_written = @{activity('Bronze To Silver').output.runOutput}\nWHERE adf_run_id = '@{pipeline().parameters.adf_run_id}' AND table_id = @{pipeline().parameters.table_id};",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
 					}
 				],
 				"policy": {
@@ -261,6 +297,10 @@
 					"table_id": {
 						"type": "string",
 						"defaultValue": "1"
+					},
+					"adf_run_id": {
+						"type": "string",
+						"defaultValue": "adf1"
 					}
 				},
 				"variables": {
@@ -274,7 +314,8 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AzureSqlDB')]",
 				"[concat(variables('factoryId'), '/datasets/PostgreSql_DS')]",
 				"[concat(variables('factoryId'), '/datasets/DS_ADLS_Parquet')]",
-				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricksLS')]"
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricksLS')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_LS')]"
 			]
 		},
 		{
@@ -330,22 +371,95 @@
 								"value": "@activity('Read Source Table List').output.value",
 								"type": "Expression"
 							},
+							"isSequential": false,
 							"activities": [
 								{
-									"name": "Set variable1",
-									"type": "SetVariable",
-									"dependsOn": [],
+									"name": "Ingest From Source To Silver",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "In Progress Status",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
 									"policy": {
-										"secureOutput": false,
 										"secureInput": false
 									},
 									"userProperties": [],
 									"typeProperties": {
-										"variableName": "test",
-										"value": {
-											"value": "@string(item().table_id)",
-											"type": "Expression"
+										"pipeline": {
+											"referenceName": "PL_SOURCE_TO_SILVER_INNER",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {}
+									}
+								},
+								{
+									"name": "In Progress Status",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AzureSqlDatabase_LS",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "INSERT INTO ctrl.audit_log(adf_run_id, table_id, stage, status, start_time) VALUES\n('@{pipeline().parameters.adf_run_id}', @{item().table_id}, 'SOURCE_TO_SILVER', 'IN_PROGRESS', SYSUTCDATETIME())",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Updated Failed Status",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Ingest From Source To Silver",
+											"dependencyConditions": [
+												"Failed"
+											]
 										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 1,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AzureSqlDatabase_LS",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "UPDATE ctrl.audit_log\nSET status = 'FAILED',  end_time = SYSUTCDATETIME()\nWHERE adf_run_id = '@{pipeline().parameters.adf_run_id}' AND table_id = item().table_id",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
 									}
 								}
 							]
@@ -359,6 +473,10 @@
 					"surce_system": {
 						"type": "string",
 						"defaultValue": "neon_postgres"
+					},
+					"adf_run_id": {
+						"type": "string",
+						"defaultValue": "adf3"
 					}
 				},
 				"variables": {
@@ -369,7 +487,9 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AzureSqlDB')]"
+				"[concat(variables('factoryId'), '/datasets/DS_AzureSqlDB')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_SOURCE_TO_SILVER_INNER')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase_LS')]"
 			]
 		},
 		{
@@ -520,6 +640,30 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricksLS')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://adb-7405611347185525.5.azuredatabricks.net",
+					"accessToken": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "AzureKeyVaultls",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "databricks-access-token-connector"
+					},
+					"existingClusterId": "[parameters('AzureDatabricksLS_properties_typeProperties_existingClusterId')]"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVaultls')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/AzureKeyVaultls')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
 			"apiVersion": "2018-06-01",
@@ -600,30 +744,6 @@
 				}
 			},
 			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AzureDatabricksLS')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureDatabricks",
-				"typeProperties": {
-					"domain": "https://adb-7405611347185525.5.azuredatabricks.net",
-					"accessToken": {
-						"type": "AzureKeyVaultSecret",
-						"store": {
-							"referenceName": "AzureKeyVaultls",
-							"type": "LinkedServiceReference"
-						},
-						"secretName": "databricks-access-token-connector"
-					},
-					"existingClusterId": "[parameters('AzureDatabricksLS_properties_typeProperties_existingClusterId')]"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AzureKeyVaultls')]"
-			]
 		}
 	]
 }
